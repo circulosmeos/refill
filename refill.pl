@@ -1,10 +1,18 @@
 #!/usr/bin/env perl
 #
+# Complete (refill) a file with parts of another.
+# Bytes 0x0 are considered refillable if one of the two files has a non 0x0 value.
+# In case one file is bigger than the other, the extra bytes will be considered
+# good data and appended to output.
 #
+# by Roberto S. Galende, 2020
 #
 use strict;
 
 use Digest::MD5 qw(md5_hex);
+
+my $VERSION = '1.0';
+my $REFILL_VERSION = 'Complete (refill) a file with parts of another - v'. $VERSION;
 
 my $BUFFER_LENGTH = 2**10;
 
@@ -21,10 +29,15 @@ $parameters = shift @ARGV or goto SHOW_MAN_PAGE;
 
 if ( $parameters =~ /^\-\w+$/ ) {
 
-    if ( $parameters =~ /^\-[\-0123Phv\?]+$/ ) {
+    if ( $parameters =~ /^\-[\-0123PhvV\?]+$/ ) {
 
         if ( $parameters =~ /[h\?]/ ) {
             goto SHOW_MAN_PAGE;
+        }
+
+        if ( $parameters =~ /[v]/ ) {
+            print STDERR "\n$REFILL_VERSION\n";
+            exit (0);
         }
 
         if ($parameters ne '') {
@@ -32,15 +45,15 @@ if ( $parameters =~ /^\-\w+$/ ) {
                 $MODE = 0 if $parameters =~ /0/; # use STDOUT as output
                 $MODE = 1 if $parameters =~ /1/; # overwrite 1st file
                 $MODE = 2 if $parameters =~ /2/; # overwrite 2nd file
-                $VERBOSE = 1 if $parameters =~ /v/; # verbose mode
-                $VERBOSE = 2 if $parameters =~ /vv/; # verbose mode
+                $VERBOSE = 1 if $parameters =~ /V/; # verbose mode
+                $VERBOSE = 2 if $parameters =~ /VV/; # verbose mode
         }
 
         $FILE_1 = shift;
 
     } else {
 
-        print STDERR "Parameters contain unrecognized options: '$parameters'\nwhilst expected: '-[0123Phv]'\n";
+        print STDERR "Parameters contain unrecognized options: '$parameters'\nwhilst expected: '-[0123PhV]'\n";
         exit 1;
 
     }
@@ -86,7 +99,7 @@ if ( $MODE == 3 ) {
 }
 
 my $offset = 0;
-my ($bytes_read1, $bytes_read2, $bytes1, $bytes2, $i, $refilling_type);
+my ( $bytes_read1, $bytes_read2, $bytes1, $bytes2, $i, $refilling_type, $eof2_informed );
 
 while ( 1 ) {
 
@@ -203,7 +216,13 @@ while ( 1 ) {
     if ( $bytes_read1 != $BUFFER_LENGTH or $bytes_read2 != $BUFFER_LENGTH
          and ( $bytes_read1 != 0 and $bytes_read2 != 0 )
          or  ( $bytes_read1 == 0 and $bytes_read2 == 0 ) ) {
-        print STDERR "\nEOF\n";
+        if ( eof(f2) and $eof2_informed == 0 ) {
+            print STDERR "\nEnd Of File FILE_2\n";
+            $eof2_informed = 1;
+        } else {
+            print STDERR "\nEnd Of File FILE_1\n";
+        }
+
     }
 
     $offset += $i;
@@ -226,7 +245,7 @@ SHOW_MAN_PAGE:
 
 print STDERR <<MAN_PAGE;
 
-Complete (refill) a file with parts of another.
+$REFILL_VERSION
 Bytes 0x0 are considered refillable if one of the two files has a non 0x0 value.
 In case one file is bigger than the other, the extra bytes will be considered
 good data and appended to output.
@@ -251,5 +270,7 @@ whilst in Windows double quotation marks are needed: ""
 
   -h: show this help
 
-  -v: verbose mode
+  -V: verbose mode
 MAN_PAGE
+
+exit (0);
