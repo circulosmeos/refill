@@ -5,7 +5,7 @@
 # In case one file is bigger than the other, the extra bytes will be considered
 # good data and appended to output.
 #
-# by Roberto S. Galende, 2020
+# by Roberto S. Galende, June 2020
 #
 use strict;
 
@@ -14,6 +14,15 @@ use Digest::MD5 qw(md5_hex);
 my $VERSION = '1.0';
 my $REFILL_VERSION = 'Complete (refill) a file with parts of another - v'. $VERSION;
 
+my $CHAR_EQUAL                      = '.';
+my $CHAR_FIRST_N_SECOND             = '*';
+my $CHAR_FIRST_N_SECOND_N_APPEND    = '+';
+my $CHAR_FIRT                       = '1';
+my $CHAR_SECOND                     = '2';
+my $CHAR_FIRST_N_APPEND             = '¹';
+my $CHAR_SECOND_N_APPEND            = '²';
+
+
 my $BUFFER_LENGTH = 2**10;
 
 my ( $FILE_1, $FILE_2, $FILE_3 );
@@ -21,6 +30,11 @@ my $parameters = '';
 my $MODE = 3; # expected third filename for output
 
 my $VERBOSE == 0;
+
+my ( $number_of_bytes1, $number_of_bytes2, $bytes1, $bytes2, $i,
+     $eof1_informed, $eof2_informed, $last_position_of_difference );
+my $refilling_type = 0;
+my $offset = 0;
 
 #-------------------------------------------------------------------------------
 
@@ -45,8 +59,7 @@ if ( $parameters =~ /^\-\w+$/ ) {
                 $MODE = 0 if $parameters =~ /0/; # use STDOUT as output
                 $MODE = 1 if $parameters =~ /1/; # overwrite 1st file
                 $MODE = 2 if $parameters =~ /2/; # overwrite 2nd file
-                $VERBOSE = 1 if $parameters =~ /V/; # verbose mode
-                $VERBOSE = 2 if $parameters =~ /VV/; # verbose mode
+                $VERBOSE = length($1) if $parameters =~ /(V+)/; # verbose mode
         }
 
         $FILE_1 = shift;
@@ -98,54 +111,58 @@ if ( $MODE == 3 ) {
     open fOut, '>:raw', $FILE_3;
 }
 
-my $offset = 0;
-my ( $bytes_read1, $bytes_read2, $bytes1, $bytes2, $i, $refilling_type, $eof2_informed );
+my ( $output, $good_string, $difference, $number_of_differences );
 
 while ( 1 ) {
 
-    my $good_string = '';
-    my $difference = '.';
-    my $number_of_differences = 0;
+    $output;
+    $good_string = '';
+    $difference = '.';
+    $number_of_differences = 0;
 
-    $bytes_read1 = read ( f1, $bytes1, $BUFFER_LENGTH );
+    $number_of_bytes1 = read ( f1, $bytes1, $BUFFER_LENGTH );
 
-    $bytes_read2 = read ( f2, $bytes2, $BUFFER_LENGTH );
+    $number_of_bytes2 = read ( f2, $bytes2, $BUFFER_LENGTH );
 
-    if ( $bytes_read1 == 0 ) {
-        if ( $bytes_read2 == 0 ) {
+    if ( $number_of_bytes1 == 0 ) {
+        if ( $number_of_bytes2 == 0 ) {
             # EOF for both files has been reached,
             # so exit while loop as there's nothing more to do:
             last;
         } else {
-            # that is, eof(f1) and no f1 content read in this run
-            # but there's still f2 content to add: we will trick
-            # the for loop to think that $bytes1 and $bytes2 are equal:
-            $bytes_read1 = $bytes_read2;
-            $bytes1 = $bytes2;
-            $refilling_type = 2; # to choose the appropriate informative STDERR char 
+            # That is, eof(f1) and no f1 content read in this run
+            # but there's still f2 content to add.
+
+            # To choose the appropriate informative STDERR char,
+            # and also to refill FILE_1 correctly, without backwards seeks:
+            $refilling_type = 2;
         }
     }
 
-    print STDERR "[bytes_read1= $bytes_read1, bytes_read2= $bytes_read2]" if $VERBOSE == 1;
-    print STDERR "[offset= $offset]" if $VERBOSE == 2;
+    print STDERR "[#bytes1= $number_of_bytes1, #bytes2= $number_of_bytes2]" if $VERBOSE >= 1;
+    print STDERR "[offset= $offset]" if $VERBOSE >= 2;
+    print STDERR '[' . ( ( md5_hex($bytes1) eq md5_hex($bytes2) )?'eq':'ne' ) . ", $refilling_type\]" if $VERBOSE >= 3;
+    print STDERR '[' . md5_hex($bytes1) .' '. md5_hex($bytes2) . "]" if $VERBOSE == 4;
+    print STDERR '[' . md5_hex($bytes1) .' '. md5_hex($bytes2) . "]" if $VERBOSE >= 5;
 
-    if (  md5_hex($bytes1) ne md5_hex($bytes2) ) {
+    if ( $refilling_type == 0 &&
+         md5_hex($bytes1) ne md5_hex($bytes2) ) {
 
-        for ( $i = 0; $i < $bytes_read1 or $i < $bytes_read2; $i++ ) {
+        for ( $i = 0; $i < $number_of_bytes1 or $i < $number_of_bytes2; $i++ ) {
 
             # last bytes: FILE_1 and FILE_2 have different sizes
-            if ( $bytes_read1 != $bytes_read2 and
-                ( $i == $bytes_read1 or $i == $bytes_read2 )
+            if ( $number_of_bytes1 != $number_of_bytes2 and
+                ( $i == $number_of_bytes1 or $i == $number_of_bytes2 )
                 ) {
 
-                my $tail_string = substr( ( ($bytes_read1 < $bytes_read2)?$bytes2:$bytes1 ), $i );
+                my $tail_string = substr( ( ($number_of_bytes1 < $number_of_bytes2)?$bytes2:$bytes1 ), $i );
                 $number_of_differences += length( $tail_string );
                 $good_string .= $tail_string;
 
                 ($difference eq '.' || $difference eq '1')?($difference = '¹'):($difference = '+');
-                ($difference eq '.' || $difference eq '2')?($difference = '²'):($difference = '+') if $i == $bytes_read1;
+                ($difference eq '.' || $difference eq '2')?($difference = '²'):($difference = '+') if $i == $number_of_bytes1;
 
-                $i = ($bytes_read1 < $bytes_read2)?$bytes_read2:$bytes_read1;
+                $last_position_of_difference = ($number_of_bytes1 < $number_of_bytes2)?$number_of_bytes2:$number_of_bytes1;
 
                 last;
 
@@ -157,6 +174,7 @@ while ( 1 ) {
             if ( $char1 != $char2 ) {
 
                 $number_of_differences++;
+                $last_position_of_difference = $i;
 
                 if ( $char1 == 0 ) {
                     $good_string .= chr( $char2 );
@@ -177,53 +195,58 @@ while ( 1 ) {
 
         }
 
-        if ( $MODE == 1 ) {
-            # how many bytes do we must go backwards in f1?
-            # always $bytes_read1 (which can be 0)
-            seek( f1, $bytes_read1, 1 );
-            print f1 $good_string;
-        } elsif ( $MODE == 2 ) {
-            # how many bytes do we must go backwards in f2?
-            # always $bytes_read2 (which can be 0)
-            seek( f2, $bytes_read2, 1 );
-            print f2 $good_string;
-        } else  {
-            print fOut $good_string;
-        }
+        $output = \$good_string;
 
     } else {
+        # strings are equal, or $refilling_type == 2
 
-        $i = $bytes_read1; # $bytes_read1 and $bytes_read2 are equal
+        $i = $number_of_bytes2; # $number_of_bytes1 and $number_of_bytes2 are equal
         
         if ( $refilling_type == 2 ) {
             $difference = '²';
         }
 
-        print fOut $bytes1;
+        $output = \$bytes2;
 
     }
+
+    # write output
+    if ( $MODE == 1 ) {
+        # how many bytes do we must go backwards in f1?
+        # always $number_of_bytes1 (which can be 0)
+        seek( f1, -$number_of_bytes1, 1 ) unless $refilling_type == 2;
+        print f1 $$output;
+    } elsif ( $MODE == 2 ) {
+        # how many bytes do we must go backwards in f2?
+        # always $number_of_bytes2 (which can be 0)
+        seek( f2, -$number_of_bytes2, 1 ) unless $refilling_type == 2;;
+        print f2 $$output;
+    } else  {
+        print fOut $$output;
+    }
+
 
     print STDERR "[i= $i]" if $VERBOSE == 2;
 
     print STDERR $difference;
-    if ( $difference ne '.' and $bytes_read1 != 0 and $bytes_read2 != 0
-         and $refilling_type != 2
-         or ( $difference eq '+' ) ) {
-        print STDERR "(\@$offset+$i, $number_of_differences B)";
+    if ( $difference ne '.' and $eof1_informed == 0 and $eof2_informed == 0 ) {
+        print STDERR "(\@$offset+$last_position_of_difference, $number_of_differences B)";
     }
     $|=1;
 
-    if ( $bytes_read1 != $BUFFER_LENGTH or $bytes_read2 != $BUFFER_LENGTH
-         and ( $bytes_read1 != 0 and $bytes_read2 != 0 )
-         or  ( $bytes_read1 == 0 and $bytes_read2 == 0 ) ) {
-        if ( eof(f2) and $eof2_informed == 0 ) {
-            print STDERR "\nEnd Of File FILE_2\n";
-            $eof2_informed = 1;
-        } else {
-            print STDERR "\nEnd Of File FILE_1\n";
+    #if ( $number_of_bytes1 != $BUFFER_LENGTH or $number_of_bytes2 != $BUFFER_LENGTH
+    #     and ( $number_of_bytes1 != 0 and $number_of_bytes2 != 0 )
+    #     or  ( $number_of_bytes1 == 0 and $number_of_bytes2 == 0 )
+    #     or $refilling_type == 2 ) {
+        if ( ( eof(f1) or $refilling_type != 0 ) and $eof1_informed == 0) {
+            print STDERR "\nEnd Of File FILE_1";
+            $eof1_informed = 1;
         }
-
-    }
+        if ( eof(f2) and $eof2_informed == 0 ) {
+            print STDERR "\nEnd Of File FILE_2";
+            $eof2_informed = 1;
+        }
+    #}
 
     $offset += $i;
 
@@ -233,7 +256,7 @@ close f1;
 close f2;
 close fOut;
 
-print STDERR "OK\n";
+print STDERR "\nOK\n";
 
 exit(0);
 
