@@ -11,17 +11,19 @@ use strict;
 
 use Digest::MD5 qw(md5_hex);
 
+#-------------------------------------------------------------------------------
+
 my $VERSION = '1.0';
 my $REFILL_VERSION = 'Complete (refill) a file with parts of another - v'. $VERSION;
 
-my $CHAR_EQUAL                      = '.';
-my $CHAR_FIRST_N_SECOND             = '*';
-my $CHAR_FIRST_N_SECOND_N_APPEND    = '+';
-my $CHAR_FIRT                       = '1';
-my $CHAR_SECOND                     = '2';
-my $CHAR_FIRST_N_APPEND             = '¹';
-my $CHAR_SECOND_N_APPEND            = '²';
-
+# chars to print when comparing files:
+my $CHAR_EQUAL              = '.';
+my $CHAR_1ST_N_2ND          = '*';
+my $CHAR_1ST_N_2ND_N_APPEND = '+';
+my $CHAR_1ST                = '1';
+my $CHAR_2ND                = '2';
+my $CHAR_1ST_N_APPEND       = '¹';
+my $CHAR_2ND_N_APPEND       = '²';
 
 my $BUFFER_LENGTH = 2**10;
 
@@ -37,7 +39,7 @@ my $refilling_type = 0;
 my $offset = 0;
 
 #-------------------------------------------------------------------------------
-
+# read input parameters:
 
 $parameters = shift @ARGV or goto SHOW_MAN_PAGE;
 
@@ -89,7 +91,7 @@ if ( $parameters !~ /^\-.*[012]/ ) {
 
 
 #-------------------------------------------------------------------------------
-
+# process:
 
 if ( $MODE == 0 ) {
     open fOut, '>-:raw';
@@ -115,15 +117,16 @@ my ( $output, $good_string, $difference, $number_of_differences );
 
 while ( 1 ) {
 
-    $output;
+    # reset variables
     $good_string = '';
-    $difference = '.';
+    $difference = $CHAR_EQUAL;
     $number_of_differences = 0;
 
+    # read from files to buffers $bytesN
     $number_of_bytes1 = read ( f1, $bytes1, $BUFFER_LENGTH );
-
     $number_of_bytes2 = read ( f2, $bytes2, $BUFFER_LENGTH );
 
+    # detect EOF in one or both input files
     if ( $number_of_bytes1 == 0 ) {
         if ( $number_of_bytes2 == 0 ) {
             # EOF for both files has been reached,
@@ -135,7 +138,7 @@ while ( 1 ) {
 
             # To choose the appropriate informative STDERR char,
             # and also to refill FILE_1 correctly, without backwards seeks:
-            $refilling_type = 2;
+            $refilling_type = 2; # exclusively refilling with 2nd file
         }
     }
 
@@ -145,8 +148,11 @@ while ( 1 ) {
     print STDERR '[' . md5_hex($bytes1) .' '. md5_hex($bytes2) . "]" if $VERBOSE == 4;
     print STDERR '[' . md5_hex($bytes1) .' '. md5_hex($bytes2) . "]" if $VERBOSE >= 5;
 
+    # refill different depending on if both file input buffers are equal or not:
+    # this is to maximize speed when buffers are equal
     if ( $refilling_type == 0 &&
          md5_hex($bytes1) ne md5_hex($bytes2) ) {
+        # strings are not equal
 
         for ( $i = 0; $i < $number_of_bytes1 or $i < $number_of_bytes2; $i++ ) {
 
@@ -159,10 +165,16 @@ while ( 1 ) {
                 $number_of_differences += length( $tail_string );
                 $good_string .= $tail_string;
 
-                ($difference eq '.' || $difference eq '1')?($difference = '¹'):($difference = '+');
-                ($difference eq '.' || $difference eq '2')?($difference = '²'):($difference = '+') if $i == $number_of_bytes1;
+                if ( $i == $number_of_bytes1 ) {
+                    ($difference eq $CHAR_EQUAL or $difference eq $CHAR_2ND)?
+                        ($difference = $CHAR_2ND_N_APPEND):($difference = $CHAR_1ST_N_2ND_N_APPEND);
+                } else {
+                    ($difference eq $CHAR_EQUAL or $difference eq $CHAR_1ST)?
+                        ($difference = $CHAR_1ST_N_APPEND):($difference = $CHAR_1ST_N_2ND_N_APPEND);
+                }
 
-                $last_position_of_difference = ($number_of_bytes1 < $number_of_bytes2)?$number_of_bytes2:$number_of_bytes1;
+                $last_position_of_difference =
+                    ($number_of_bytes1 < $number_of_bytes2)?$number_of_bytes2:$number_of_bytes1;
 
                 last;
 
@@ -179,12 +191,14 @@ while ( 1 ) {
                 if ( $char1 == 0 ) {
                     $good_string .= chr( $char2 );
                     if ( $char2 != 0 ) {
-                        ($difference eq '.' || $difference eq '2')?($difference = '2'):($difference = '*');
+                        ($difference eq $CHAR_EQUAL or $difference eq $CHAR_2ND)?
+                            ($difference = $CHAR_2ND):($difference = $CHAR_1ST_N_2ND);
                     }
                 } else {
                     # in case both files differ in != 0x0 values, FILE_1 takes precedence
                     $good_string .= chr( $char1 );
-                    ($difference eq '.' || $difference eq '1')?($difference = '1'):($difference = '*');
+                    ($difference eq $CHAR_EQUAL or $difference eq $CHAR_1ST)?
+                        ($difference = $CHAR_1ST):($difference = $CHAR_1ST_N_2ND);
                 }
 
             } else {
@@ -198,12 +212,12 @@ while ( 1 ) {
         $output = \$good_string;
 
     } else {
-        # strings are equal, or $refilling_type == 2
+        # strings are equal, or $refilling_type == 2 (exclusively refilling with 2nd file)
 
         $i = $number_of_bytes2; # $number_of_bytes1 and $number_of_bytes2 are equal
         
         if ( $refilling_type == 2 ) {
-            $difference = '²';
+            $difference = $CHAR_2ND_N_APPEND;
         }
 
         $output = \$bytes2;
@@ -225,28 +239,25 @@ while ( 1 ) {
         print fOut $$output;
     }
 
-
     print STDERR "[i= $i]" if $VERBOSE == 2;
 
+    # print CHAR to screen and inform changes made
     print STDERR $difference;
-    if ( $difference ne '.' and $eof1_informed == 0 and $eof2_informed == 0 ) {
+    if ( $difference ne $CHAR_EQUAL and
+         $eof1_informed == 0 and $eof2_informed == 0 ) {
         print STDERR "(\@$offset+$last_position_of_difference, $number_of_differences B)";
     }
     $|=1;
 
-    #if ( $number_of_bytes1 != $BUFFER_LENGTH or $number_of_bytes2 != $BUFFER_LENGTH
-    #     and ( $number_of_bytes1 != 0 and $number_of_bytes2 != 0 )
-    #     or  ( $number_of_bytes1 == 0 and $number_of_bytes2 == 0 )
-    #     or $refilling_type == 2 ) {
-        if ( ( eof(f1) or $refilling_type != 0 ) and $eof1_informed == 0) {
-            print STDERR "\nEnd Of File FILE_1";
-            $eof1_informed = 1;
-        }
-        if ( eof(f2) and $eof2_informed == 0 ) {
-            print STDERR "\nEnd Of File FILE_2";
-            $eof2_informed = 1;
-        }
-    #}
+    # inform EOFs reached
+    if ( ( eof(f1) or $refilling_type != 0 ) and $eof1_informed == 0) {
+        print STDERR "\nEnd Of File FILE_1";
+        $eof1_informed = 1;
+    }
+    if ( eof(f2) and $eof2_informed == 0 ) {
+        print STDERR "\nEnd Of File FILE_2";
+        $eof2_informed = 1;
+    }
 
     $offset += $i;
 
@@ -261,7 +272,7 @@ print STDERR "\nOK\n";
 exit(0);
 
 #-------------------------------------------------------------------------------
-
+# show help:
 
 SHOW_MAN_PAGE:
 
@@ -287,13 +298,13 @@ whilst in Windows double quotation marks are needed: ""
 
   -1: overwrite FILE_1 with parts of FILE_2 (no OUTPUT_FILE needed)
 
-  -2: overwrite FILE_1 with parts of FILE_1 (no OUTPUT_FILE needed)
+  -2: overwrite FILE_2 with parts of FILE_1 (no OUTPUT_FILE needed)
 
   -3: Default option: use OUTPUT_FILE as output
 
   -h: show this help
 
-  -V: verbose mode
+  -V: verbose mode. Up to `-VVVVV`.
 MAN_PAGE
 
 exit (0);
