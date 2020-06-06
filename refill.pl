@@ -8,6 +8,7 @@
 # non-zero values are found at the same byte position.
 #
 # by Roberto S. Galende, June 2020
+# licensed under GPLv3 //www.gnu.org/licenses/gpl-3.0.en.html
 #
 use strict;
 
@@ -98,7 +99,7 @@ if ( $parameters =~ /^\-\w+$/ ) {
 
 $FILE_2 = shift or goto SHOW_MAN_PAGE;;
 
-if ( $parameters !~ /^\-.*[012]/ ) {
+if ( $MODE == 3 ) {
 
     # if not otherwise indicated, a third file is needed for output
     $FILE_3 = shift;
