@@ -4,6 +4,8 @@
 # Bytes 0x0 are considered refillable if one of the two files has a non 0x0 value.
 # In case one file is bigger than the other, the extra bytes will be considered
 # good data and appended to output.
+# FILE_1 values take precedence over FILE_2 bytes in case different but
+# non-zero values are found at the same byte position.
 #
 # by Roberto S. Galende, June 2020
 #
@@ -25,7 +27,7 @@ my $CHAR_2ND                = '2';
 my $CHAR_1ST_N_APPEND       = '¹';
 my $CHAR_2ND_N_APPEND       = '²';
 
-my $BUFFER_LENGTH = 2**10;
+my $BUFFER_LENGTH = 2**20;
 
 my ( $FILE_1, $FILE_2, $FILE_3 );
 my $parameters = '';
@@ -45,7 +47,9 @@ $parameters = shift @ARGV or goto SHOW_MAN_PAGE;
 
 if ( $parameters =~ /^\-\w+$/ ) {
 
-    if ( $parameters =~ /^\-[\-0123PhvV\?]+$/ ) {
+    if ( $parameters =~ /^\-[\-0123hsvV\?]*(n\d+)*[hsvV\?]*[0123]*$/ ) {
+
+        # `--` allows a first filename whose first character is '-'
 
         if ( $parameters =~ /[h\?]/ ) {
             goto SHOW_MAN_PAGE;
@@ -58,17 +62,29 @@ if ( $parameters =~ /^\-\w+$/ ) {
 
         if ($parameters ne '') {
                 # -h was previously processed and implied immediate end.
-                $MODE = 0 if $parameters =~ /0/; # use STDOUT as output
-                $MODE = 1 if $parameters =~ /1/; # overwrite 1st file
-                $MODE = 2 if $parameters =~ /2/; # overwrite 2nd file
+                $MODE = 0 if $parameters =~ /(?<![\dn])0/; # use STDOUT as output
+                $MODE = 1 if $parameters =~ /(?<![\dn])1/; # overwrite 1st file
+                $MODE = 2 if $parameters =~ /(?<![\dn])2/; # overwrite 2nd file
                 $VERBOSE = length($1) if $parameters =~ /(V+)/; # verbose mode
+                $VERBOSE = -1 if $parameters =~ /s/;    # silent mode
+
+                $BUFFER_LENGTH = $1 if $parameters =~ /n(\d+)/; # bytes per reading block
+                if ( $BUFFER_LENGTH <= 0 ) {
+                    print STDERR "Parameter `-n` must be greater than zero";
+                    die;
+                }
+        }
+
+        if ( $VERBOSE >= 1 ) {
+            print STDERR "mode = $MODE\n";
+            print STDERR "-n   = $BUFFER_LENGTH\n";
         }
 
         $FILE_1 = shift;
 
     } else {
 
-        print STDERR "Parameters contain unrecognized options: '$parameters'\nwhilst expected: '-[0123PhV]'\n";
+        print STDERR "Parameters contain unrecognized options: '$parameters'\nwhilst expected: '-[0123hn#sV]'\n";
         exit 1;
 
     }
@@ -94,23 +110,23 @@ if ( $parameters !~ /^\-.*[012]/ ) {
 # process:
 
 if ( $MODE == 0 ) {
-    open fOut, '>-:raw';
+    open fOut, '>-:raw' or die "ERROR: Couldn't open STDOUT\n";
 }
 
 if ( $MODE != 1 ) {
-    open f1, '<:raw', $FILE_1;
+    open f1, '<:raw', $FILE_1 or die "ERROR: Couldn't open $FILE_1\n";
 } else {
-    open f1, '+<:raw', $FILE_1;
+    open f1, '+<:raw', $FILE_1 or die "ERROR: Couldn't open $FILE_1\n";
 }
 
 if ( $MODE != 2 ) {
-    open f2, '<:raw', $FILE_2;
+    open f2, '<:raw', $FILE_2 or die "ERROR: Couldn't open $FILE_2\n";
 } else {
-    open f2, '+<:raw', $FILE_2;
+    open f2, '+<:raw', $FILE_2 or die "ERROR: Couldn't open $FILE_2\n";
 }
 
 if ( $MODE == 3 ) {
-    open fOut, '>:raw', $FILE_3;
+    open fOut, '>:raw', $FILE_3 or die "ERROR: Couldn't open $FILE_3\n";
 }
 
 my ( $output, $good_string, $difference, $number_of_differences );
@@ -142,8 +158,8 @@ while ( 1 ) {
         }
     }
 
-    print STDERR "[#bytes1= $number_of_bytes1, #bytes2= $number_of_bytes2]" if $VERBOSE >= 1;
-    print STDERR "[offset= $offset]" if $VERBOSE >= 2;
+    print STDERR "[#bytes1= $number_of_bytes1, #bytes2= $number_of_bytes2]" if $VERBOSE >= 2;
+    print STDERR "[offset= $offset]" if $VERBOSE >= 3;
     print STDERR '[' . ( ( md5_hex($bytes1) eq md5_hex($bytes2) )?'eq':'ne' ) . ", $refilling_type\]" if $VERBOSE >= 3;
     print STDERR '[' . md5_hex($bytes1) .' '. md5_hex($bytes2) . "]" if $VERBOSE == 4;
     print STDERR '[' . md5_hex($bytes1) .' '. md5_hex($bytes2) . "]" if $VERBOSE >= 5;
@@ -239,23 +255,23 @@ while ( 1 ) {
         print fOut $$output;
     }
 
-    print STDERR "[i= $i]" if $VERBOSE == 2;
+    print STDERR "[i= $i]" if $VERBOSE >= 2;
 
     # print CHAR to screen and inform changes made
-    print STDERR $difference;
+    print STDERR $difference if $VERBOSE >= 0;
     if ( $difference ne $CHAR_EQUAL and
          $eof1_informed == 0 and $eof2_informed == 0 ) {
-        print STDERR "(\@$offset+$last_position_of_difference, $number_of_differences B)";
+        print STDERR "(\@$offset+$last_position_of_difference, $number_of_differences B)" if $VERBOSE >= 0;
     }
     $|=1;
 
     # inform EOFs reached
     if ( ( eof(f1) or $refilling_type != 0 ) and $eof1_informed == 0) {
-        print STDERR "\nEnd Of File FILE_1";
+        print STDERR "\nEnd Of File FILE_1" if $VERBOSE >= 0;
         $eof1_informed = 1;
     }
     if ( eof(f2) and $eof2_informed == 0 ) {
-        print STDERR "\nEnd Of File FILE_2";
+        print STDERR "\nEnd Of File FILE_2" if $VERBOSE >= 0;
         $eof2_informed = 1;
     }
 
@@ -267,7 +283,7 @@ close f1;
 close f2;
 close fOut;
 
-print STDERR "\nOK\n";
+print STDERR "\nOK\n" if $VERBOSE >= 0;
 
 exit(0);
 
@@ -286,7 +302,7 @@ good data and appended to output.
 
 Use:
 
-  ./refill.pl [-0123Ph] FILE_1 FILE_2 [ OUTPUT_FILE ]
+  ./refill.pl [-0123n#hsV] FILE_1 FILE_2 [ OUTPUT_FILE ]
 
 FILE_1 values take precedence over FILE_2 bytes in case different but
 non-zero values are found at the same byte position.
@@ -302,7 +318,11 @@ whilst in Windows double quotation marks are needed: ""
 
   -3: Default option: use OUTPUT_FILE as output
 
+  -n#: number of bytes per reading block (by default 1048576 (1 MiB))
+
   -h: show this help
+
+  -s: silent mode
 
   -V: verbose mode. Up to `-VVVVV`.
 MAN_PAGE
