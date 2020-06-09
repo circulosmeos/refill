@@ -97,12 +97,12 @@ if ( $parameters =~ /^\-\w+$/ ) {
 
 }
 
-$FILE_2 = shift or goto SHOW_MAN_PAGE;;
+$FILE_2 = shift or goto SHOW_MAN_PAGE;
 
 if ( $MODE == 3 ) {
 
     # if not otherwise indicated, a third file is needed for output
-    $FILE_3 = shift;
+    $FILE_3 = shift or goto SHOW_MAN_PAGE;
 
 }
 
