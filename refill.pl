@@ -69,7 +69,7 @@ if ( $parameters =~ /^\-\w+$/ ) {
                 $VERBOSE = length($1) if $parameters =~ /(V+)/; # verbose mode
                 $VERBOSE = -1 if $parameters =~ /s/;    # silent mode
 
-                $BUFFER_LENGTH = $1 if $parameters =~ /n(\d+)/; # bytes per reading block
+                $BUFFER_LENGTH = $1 if $parameters =~ /n(\d+)/; # bytes per read block
                 if ( $BUFFER_LENGTH <= 0 ) {
                     print STDERR "Parameter `-n` must be greater than zero";
                     die;
@@ -319,7 +319,7 @@ whilst in Windows double quotation marks are needed: ""
 
   -3: Default option: use OUTPUT_FILE as output
 
-  -n#: number of bytes per reading block (by default 1048576 (1 MiB))
+  -n#: number of bytes per read block (by default 1048576 (1 MiB))
 
   -h: show this help
 
