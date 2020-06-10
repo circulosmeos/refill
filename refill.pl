@@ -79,8 +79,7 @@ if ( $parameters =~ /^\-\w+$/ ) {
 
                 $BUFFER_LENGTH = $1 if $parameters =~ /n(\d+)/; # bytes per read block
                 if ( $BUFFER_LENGTH <= 0 ) {
-                    print STDERR "Parameter `-n` must be greater than zero";
-                    die;
+                    die "Parameter `-n` must be greater than zero\n";
                 }
         }
 
@@ -276,11 +275,11 @@ while ( 1 ) {
 
     # inform EOFs reached
     if ( ( eof(f1) or $refilling_type != 0 ) and $eof1_informed == 0) {
-        print STDERR "\nEnd Of File FILE_1" if $VERBOSE >= 0;
+        print STDERR "\nEnd Of File FILE_1\n" if $VERBOSE >= 0;
         $eof1_informed = 1;
     }
     if ( eof(f2) and $eof2_informed == 0 ) {
-        print STDERR "\nEnd Of File FILE_2" if $VERBOSE >= 0;
+        print STDERR "\nEnd Of File FILE_2\n" if $VERBOSE >= 0;
         $eof2_informed = 1;
     }
 
@@ -292,7 +291,7 @@ close f1;
 close f2;
 close fOut;
 
-print STDERR "\nOK\n" if $VERBOSE >= 0;
+print STDERR "OK\n" if $VERBOSE >= 0;
 
 exit(0);
 
