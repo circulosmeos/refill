@@ -58,6 +58,14 @@ if ( $parameters =~ /^\-\w+$/ ) {
 
         if ( $parameters =~ /[v]/ ) {
             print STDERR "\n$REFILL_VERSION\n";
+            print STDERR "\nLegend: each read block is represented with one char indicating:\n";
+            print STDERR "\n$CHAR_EQUAL\tblock is equal in both files\n";
+            print STDERR "$CHAR_1ST_N_2ND\tblock is refilled with bytes from FILE_1 and FILE_2\n";
+            print STDERR "$CHAR_1ST_N_2ND_N_APPEND\t\" \" \" \" \" from FILE_1 and FILE_2 and is appended data from one of them\n";
+            print STDERR "$CHAR_1ST\t\" \" \" \" \" from FILE_1\n";
+            print STDERR "$CHAR_2ND\t\" \" \" \" \" from FILE_2\n";
+            print STDERR "$CHAR_1ST_N_APPEND\t\" \" \" \" \" from FILE_1 and is also appended data from FILE_1\n";
+            print STDERR "$CHAR_2ND_N_APPEND\t\" \" \" \" \" from FILE_2 and is also appended data from FILE_2\n";
             exit (0);
         }
 
@@ -324,6 +332,8 @@ whilst in Windows double quotation marks are needed: ""
   -h: show this help
 
   -s: silent mode
+
+  -v: show version and explanation of chars used in ASCII output
 
   -V: verbose mode. Up to `-VVVVV`.
 MAN_PAGE
