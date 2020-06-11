@@ -50,26 +50,32 @@ Usage
 Examples of use
 ===============
 
-Suppose you have FILE_1 which has entire blocks of data erased or absent (that is, all binary zeroes) and FILE_2 which corresponds to the same whole file, but with holes of data in different parts:   
+* Suppose you have FILE_1 which has entire blocks of data erased or absent (that is, all binary zeroes) and FILE_2 which corresponds to the same whole file, but with holes of data in different parts:   
 Can the original and complete file be recovered from both of them?   
 Let's try:   
 
-    $ perl refill.pl FILE_1 FILE_2 complete_file
+        $ perl refill.pl FILE_1 FILE_2 complete_file
 
-    1(@0+629, 1 B).....................................
-    ........1(@69632+1023, 222 B)+(@70656+1024, 1024 B)
-    End Of File FILE_1
-    ²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²
-    ²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²
-    ²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²
-    End Of File FILE_2
-    OK
+        1(@0+629, 1 B).....................................
+        ........1(@69632+1023, 222 B)+(@70656+1024, 1024 B)
+        End Of File FILE_1
+        ²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²
+        ²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²
+        ²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²
+        End Of File FILE_2
+        OK
 
 Now `complete_file` will contain a file made up from filled chunks from FILE_1 and FILE_2: if the holes didn't overlap, this is the complete original file. If the holes overlap, but not completely, this file will contain more data, but not all.
 
-Also, one can use one of the files as source and destination of the recovery: **Please, be aware that this overwrites the original file data!** Use at your own risk. For example to do the same thing than in the previous example, but making FILE_1 directly the recovered file:
+Note that if a difference is found, a message of this type is printed **?**(`@INITIAL_BYTE_POSITION` + `UNTIL_THIS_BYTE_LATER`, `THIS_#BYTES_DIFFERENT`).
 
-    $ perl refill.pl -1 FILE_1 FILE_2
+* Also, one can use one of the files as source and destination of the recovery: **Please, be aware that this overwrites the original file data!** Use at your own risk. For example to do the same thing than in the previous example, but making FILE_1 directly the recovered file:
+
+        $ perl refill.pl -1 FILE_1 FILE_2
+
+* `-0` with `/dev/null` can be used to simply compare two files and obtain useful info printed for positions of their differences:
+
+        $ perl refill.pl -0 FILE_1 FILE_2 > /dev/null
 
 Legend
 ======
