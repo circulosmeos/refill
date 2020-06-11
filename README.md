@@ -6,7 +6,9 @@ Bytes 0x0 are considered refillable if one of the two files has a non 0x0 value.
 In case one file is bigger than the other, the extra bytes will be considered good data and appended to output.   
 FILE_1 values take precedence over FILE_2 bytes in case different but non-zero values are found at the same byte position.   
 
-The script can run both in linux and in Windows. In Windows, a previous Perl installation is needed, like [strawberry Perl](http://strawberryperl.com/) or [ActiveState Perl](https://www.activestate.com/products/perl/)).
+The script can run both in linux and in Windows. In Windows, a previous Perl installation is needed, like [strawberry Perl](http://strawberryperl.com/) or [ActiveState Perl](https://www.activestate.com/products/perl/).
+
+**This software is provided "as is", without warranty of any kind, express or implied. In no event will the authors be held liable for any damages arising from the use of this software.**
 
 Usage
 =====
