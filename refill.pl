@@ -34,10 +34,10 @@ my ( $FILE_1, $FILE_2, $FILE_3 );
 my $parameters = '';
 my $MODE = 3; # expected third filename for output
 
-my $VERBOSE == 0;
+my $VERBOSE = 0;
 
 my ( $number_of_bytes1, $number_of_bytes2, $bytes1, $bytes2, $i,
-     $eof1_informed, $eof2_informed, $last_position_of_difference );
+     $last_position_of_difference );
 my $refilling_type = 0;
 my $offset = 0;
 
@@ -138,6 +138,8 @@ if ( $MODE == 3 ) {
 }
 
 my ( $output, $good_string, $difference, $number_of_differences );
+my $eof1_informed = 0;
+my $eof2_informed = 0;
 
 while ( 1 ) {
 
